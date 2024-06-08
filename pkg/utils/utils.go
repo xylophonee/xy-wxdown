@@ -15,6 +15,7 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -257,8 +258,8 @@ func Upgradation(path string, v string) {
 // cmd.exe /c cd C:\\your\\directory && your-command
 // cmd.exe /k
 // "sh", "-c", "cd /path/to/directory && your-command"
-func ToPDF(path string, url string, wk string) {
-
+func ToPDF(path string, url string, wk string, wg *sync.WaitGroup) {
+	defer wg.Done()
 	// 待执行命令
 	env := Iif(runtime.GOOS == "windows", "cmd", "sh")
 	quit := Iif(runtime.GOOS == "windows", "/c", "-c")

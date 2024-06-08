@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"crypto/md5"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"github.com/PuerkitoBio/goquery"
 	"go-wx-download/internal/common"
 	"go-wx-download/internal/constant"
 	"go-wx-download/pkg/utils"
@@ -21,6 +21,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/PuerkitoBio/goquery"
 )
 
 // Folder 文件夹对象
@@ -224,13 +226,12 @@ func DownloadHtml(urlStr string, path string, newName string, sem chan struct{},
 				voiceName = audio.Name
 			}
 			// 发布时间->音频名称-->音频序号->音频后缀
-			audioName := fmt.Sprintf("%s_%s_%d.%s", createTime, voiceName, i, "mp3")
+			audioName := fmt.Sprintf("%s_%s_%d.%s", createTime, audio.Name, i, "mp3")
 			audioPath := filepath.Join(path, baseInfo["js_name"], "audios", audioName)
 			wgFile.Add(1)
 			go utils.DownloadFile(constant.AudioPrefix+voiceEncodeFileID, audioPath, nil, semFile, &wgFile)
 			// 清空节点内容进行覆盖
 			node.Node.SetHtml(utils.CreateAudioHTML(voiceName, audioName))
-			break
 		case 4:
 			vUrl, index := utils.IsValueArray(videoUrls, original)
 			if len(vUrl) > 0 {
@@ -254,7 +255,6 @@ func DownloadHtml(urlStr string, path string, newName string, sem chan struct{},
 				wgFile.Add(1)
 				go utils.DownloadFile(cUrl, imgPath, nil, semFile, &wgFile)
 			}
-			break
 		default:
 			// 计算图片内容的 MD5 哈希值
 			hash := md5.New()
@@ -659,7 +659,9 @@ func StartCollectionHome(urlStr string, path string) ([]Collect, error) {
 	sessionUs := params.Get("session_us")
 	hid := params.Get("hid")
 	sn := params.Get("sn")
-
+	if biz == "" || hid == "" || sn == "" {
+		return nil, errors.New("Url输入错误")
+	}
 	// 1、解析首页
 	album, title := parseHome(urlStr)
 	var category []string

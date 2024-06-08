@@ -72,10 +72,9 @@ func HandlerGather(w http.ResponseWriter, r *http.Request, defaultDataPath strin
 		err = json.Unmarshal(body, &urlArray)
 		if err != nil {
 			log.Println("请求体解析错误！", err)
-			_, err = w.Write(utils.Fail("请求体解析错误！"))
+			w.Write(utils.Fail("请求体解析错误！"))
 			return
 		}
-		break
 	default:
 		// 删除 /gather/
 		path = path[len("/gather/"):]
@@ -97,7 +96,7 @@ func HandlerGather(w http.ResponseWriter, r *http.Request, defaultDataPath strin
 
 	results := RemoveDuplicates(utils.UrlFilter(urlArray))
 	if len(results) == 0 {
-		_, _ = w.Write(utils.Fail("地址不符和规范！"))
+		_, _ = w.Write(utils.Fail("地址不符合规范！"))
 		return
 	}
 
@@ -123,7 +122,7 @@ func HandlerGather(w http.ResponseWriter, r *http.Request, defaultDataPath strin
 		wg.Wait()
 		close(filePaths)
 	}()
-
+	var wgPdf sync.WaitGroup
 	// 收集所有文件大小
 	for f := range filePaths {
 		log.Println(f)
@@ -136,13 +135,16 @@ func HandlerGather(w http.ResponseWriter, r *http.Request, defaultDataPath strin
 			split := strings.Split(f, string(os.PathSeparator))
 			list := split[len(split)-3:]
 			fmt.Println(list)
+			wgPdf.Add(1)
 			// 第一个参数 端口； 第二个参数 公众号名称； 第三个参数 文件名称
 			httpURL := fmt.Sprintf("http://127.0.0.1:%s/wx/%s/html/%s", port, url.QueryEscape(list[0]), url.QueryEscape(list[2]))
 			f = filepath.Join(defaultDataPath, list[0], "pdf", list[2][0:len(list[2])-len(".html")]+".pdf")
-			go utils.ToPDF(f, httpURL, cfg.Wkhtmltopdf.Path)
+			go utils.ToPDF(f, httpURL, cfg.Wkhtmltopdf.Path, &wgPdf)
 		}
 	}
-
+	if cfg.Wkhtmltopdf.Enable {
+		wgPdf.Wait()
+	}
 	// 结束时间
 	end := time.Now()
 	duration := end.Sub(start)
@@ -298,6 +300,7 @@ func HandlerCollect(w http.ResponseWriter, r *http.Request, defaultDataPath stri
 			close(filePaths)
 		}()
 
+		var wgPdf sync.WaitGroup
 		// 收集所有文件大小
 		for f := range filePaths {
 			log.Println(f)
@@ -310,11 +313,16 @@ func HandlerCollect(w http.ResponseWriter, r *http.Request, defaultDataPath stri
 				split := strings.Split(f, string(os.PathSeparator))
 				list := split[len(split)-3:]
 				fmt.Println(list)
+				wgPdf.Add(1)
 				// 第一个参数 端口； 第二个参数 公众号名称； 第三个参数 文件名称
 				httpURL := fmt.Sprintf("http://127.0.0.1:%s/wx/%s/html/%s", port, url.QueryEscape(list[0]), url.QueryEscape(list[2]))
 				f = filepath.Join(defaultDataPath, list[0], "pdf", list[2][0:len(list[2])-len(".html")]+".pdf")
-				go utils.ToPDF(f, httpURL, cfg.Wkhtmltopdf.Path)
+				go utils.ToPDF(f, httpURL, cfg.Wkhtmltopdf.Path, &wgPdf)
 			}
+		}
+
+		if cfg.Wkhtmltopdf.Enable {
+			wgPdf.Wait()
 		}
 
 		// 结束时间
